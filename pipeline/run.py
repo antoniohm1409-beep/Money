@@ -53,6 +53,9 @@ def run(cfg: dict, max_audits: int | None = None, only_city: str | None = None, 
     new_leads = 0
     outcomes: Counter = Counter()
     issue_counts: Counter = Counter()
+    all_issue_counts: Counter = Counter()
+    score_buckets: Counter = Counter()
+    readable = with_email = 0
 
     for city in ([only_city] if only_city else cfg["market"]["cities"]):
         if budget <= 0:
@@ -78,6 +81,11 @@ def run(cfg: dict, max_audits: int | None = None, only_city: str | None = None, 
             ))
 
         for lead in audited:
+            if lead["status"] == "ok":
+                readable += 1
+                with_email += bool(lead["emails"])
+                score_buckets[f"{lead['score'] // 10 * 10:02d}+"] += 1
+                all_issue_counts.update(i["id"] for i in lead["issues"])
             ok, reason = qualifies(lead, cfg, suppression)
             outcomes[reason.split(":")[0]] += 1
             seen[lead["domain"]] = {"date": dt.date.today().isoformat(), "result": reason, "score": lead["score"]}
@@ -94,6 +102,10 @@ def run(cfg: dict, max_audits: int | None = None, only_city: str | None = None, 
     print(f"\nNew leads: {new_leads}. Outcomes: {dict(outcomes)}")
     if issue_counts:
         print(f"Issues across new leads: {dict(issue_counts.most_common())}")
+    if readable:
+        print(f"Readable sites: {readable}, of which {with_email} publish an email.")
+        print(f"Score distribution: {dict(sorted(score_buckets.items()))}")
+        print(f"Issues across all readable sites: {dict(all_issue_counts.most_common())}")
     if dry_run:
         print("DRY RUN: nothing was saved.")
     if new_leads == 0 and not outcomes:

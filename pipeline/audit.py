@@ -54,6 +54,7 @@ WEIGHTS = {
     "legacy_markup": 20,
     "outdated_copyright": 12,
     "very_outdated_copyright": 18,
+    "heavy_images": 15,
     "slow_response": 12,
     "outdated_cms": 12,
     "no_https_redirect": 8,
@@ -386,6 +387,36 @@ def _robots_allows(session: requests.Session, base_url: str, user_agent: str, ti
     return parser.can_fetch(user_agent, base_url)
 
 
+def measure_images(session: requests.Session, urls: list[str], timeout: int = 8) -> dict | None:
+    """Total download size of the home page's images, from Content-Length headers."""
+    sizes: list[tuple[int, str]] = []
+    for url in urls[:15]:
+        try:
+            resp = session.head(url, timeout=timeout, allow_redirects=True)
+            size = int(resp.headers.get("content-length") or 0)
+        except (requests.RequestException, ValueError):
+            continue
+        if resp.status_code == 200 and size:
+            sizes.append((size, url))
+    if not sizes:
+        return None
+    largest = max(sizes)
+    return {"count": len(sizes), "total_mb": sum(s for s, _ in sizes) / 1e6, "largest_mb": largest[0] / 1e6,
+            "largest_url": largest[1]}
+
+
+def heavy_images_issue(measured: dict | None) -> dict | None:
+    if not measured or (measured["total_mb"] < 2.5 and measured["largest_mb"] < 1.0):
+        return None
+    return issue(
+        "heavy_images",
+        f"The home page loads about {measured['total_mb']:.1f} MB of images (the largest alone is "
+        f"{measured['largest_mb']:.1f} MB), which is a long wait on a phone connection.",
+        f"Content-Length of {measured['count']} home page images sums to {measured['total_mb']:.2f} MB; "
+        f"largest: {measured['largest_url'][:140]} ({measured['largest_mb']:.2f} MB).",
+    )
+
+
 def audit_site(business: dict, user_agent: str, timeout: int = 15) -> dict:
     """Audit one business website. Returns the business dict extended with audit results.
 
@@ -457,6 +488,10 @@ def audit_site(business: dict, user_agent: str, timeout: int = 15) -> dict:
                 "next to the address.",
                 f"Final URL {resp.url}; https:// version failed to load.",
             ))
+
+    heavy = heavy_images_issue(measure_images(session, analysis["content"]["images"]))
+    if heavy:
+        issues.append(heavy)
 
     emails = result["emails"] + analysis["emails"]
     for contact_url in analysis["contact_links"]:

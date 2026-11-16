@@ -1,6 +1,8 @@
 import datetime as dt
 import functools
 import http.server
+import shutil
+import tempfile
 import threading
 import unittest
 from pathlib import Path
@@ -105,6 +107,15 @@ class AnalyzeHtmlTest(unittest.TestCase):
         self.assertNotIn("jquery", self.dated["content"]["text"].lower())
 
 
+class HeavyImagesTest(unittest.TestCase):
+    def test_thresholds(self):
+        base = {"count": 5, "largest_url": "https://x.example/a.jpg"}
+        self.assertIsNone(audit.heavy_images_issue(None))
+        self.assertIsNone(audit.heavy_images_issue({**base, "total_mb": 2.4, "largest_mb": 0.9}))
+        self.assertIsNotNone(audit.heavy_images_issue({**base, "total_mb": 2.6, "largest_mb": 0.6}))
+        self.assertIsNotNone(audit.heavy_images_issue({**base, "total_mb": 1.2, "largest_mb": 1.1}))
+
+
 class EmailRankTest(unittest.TestCase):
     def test_own_domain_first_then_freemail_then_others(self):
         ranked = audit.rank_emails(
@@ -173,7 +184,13 @@ class AuditSiteOverHttpTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        handler = functools.partial(QuietHandler, directory=str(FIXTURES))
+        cls.tmp = tempfile.TemporaryDirectory()
+        site = Path(cls.tmp.name)
+        shutil.copytree(FIXTURES, site, dirs_exist_ok=True)
+        (site / "images").mkdir()
+        (site / "images" / "office1.jpg").write_bytes(b"\0" * 2_200_000)
+        (site / "images" / "office2.jpg").write_bytes(b"\0" * 900_000)
+        handler = functools.partial(QuietHandler, directory=str(site))
         cls.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
         cls.base = f"http://127.0.0.1:{cls.server.server_address[1]}"
@@ -181,6 +198,7 @@ class AuditSiteOverHttpTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.server.shutdown()
+        cls.tmp.cleanup()
 
     def business(self, page):
         return {"id": "t", "name": "T", "website": f"{self.base}/{page}", "domain": "127.0.0.1", "osm_emails": []}
@@ -193,6 +211,9 @@ class AuditSiteOverHttpTest(unittest.TestCase):
         self.assertIn("frontdesk@smithfamilydentistry.example", lead["emails"])
         self.assertIn("drsmith1998@gmail.com", lead["emails"])
         self.assertEqual(lead["issues"][0]["id"], "no_viewport")  # sorted by weight
+        heavy = next(i for i in lead["issues"] if i["id"] == "heavy_images")
+        self.assertIn("about 3.1 MB of images (the largest alone is 2.2 MB)", heavy["plain"])
+        self.assertIn("2 home page images", heavy["evidence"])  # logo.gif and team.jpg do not exist
 
     def test_missing_page_is_not_a_lead(self):
         lead = audit.audit_site(self.business("nope.html"), "test-agent", timeout=5)
