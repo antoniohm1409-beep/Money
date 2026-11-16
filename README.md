@@ -54,10 +54,11 @@ person who presses send, until you choose to flip `auto_send`.
 
 - Nothing here prints money. It produces **sales conversations**; you still have to send
   the emails, answer people like a human, and deliver good work.
-- Measured on a live run over 150 Austin business websites: about two thirds could be
-  read, 58% of those publish an email address, and roughly one in five loads several
-  megabytes of images on its home page. Expect a modest stream of solid leads per run,
-  not hundreds — which is the right size for 15 personal emails a day.
+- Measured on a live run (Austin, 739 businesses with a website on the map): of 150 sites
+  audited, 109 could be read, 63 publish an email, 31 had a problem a customer would
+  notice, and **9 became leads**. So expect roughly 5–10 solid leads per daily run —
+  the right size for 15 personal emails a day, and about 45 leads per city of that size
+  before you need the next city on the list.
 - Most cold emails get no answer. A few replies per hundred sent is normal, and only some
   of those buy. At 15 emails a weekday, plan on weeks, not days, to the first sale — and
   expect the offer, price and city list to need tuning.
