@@ -21,6 +21,9 @@ Also read `config.yaml` (`sender`, `offer`, `market.language`).
 - You may only describe problems listed in the lead's `issues` array. Use the `plain`
   sentence as your source of truth and `evidence` to stay precise. Never add a problem,
   number, ranking claim, or statistic that is not in the file.
+- The audit was done by software, not by you holding a phone. Describe what happens
+  ("on a phone the page shows up as a shrunken desktop layout"), not an experience you
+  did not have ("I opened it on my phone and…").
 - Do not claim to be a customer, a neighbour, or to have been referred. You found them
   while looking at `<category>` businesses in `<city>` — say so if you say anything.
 - Do not promise results (more customers, revenue, rankings). Describe what you will
