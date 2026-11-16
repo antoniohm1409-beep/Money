@@ -38,6 +38,11 @@ market:
     - "Austin, Texas, USA"
     - "San Antonio, Texas, USA"
     - "Fort Worth, Texas, USA"
+    - "Tucson, Arizona, USA"
+    - "Columbus, Ohio, USA"
+    - "Kansas City, Missouri, USA"
+    - "Tampa, Florida, USA"
+    - "Raleigh, North Carolina, USA"
   # OpenStreetMap tags of business types to prospect. High customer value +
   # commonly dated websites = best odds.
   categories:
@@ -54,8 +59,11 @@ market:
     - "amenity=restaurant"
 
 prospecting:
-  max_audits_per_run: 80    # websites crawled per GitHub Actions run
-  min_score: 35             # 0-100; only sites this weak (or weaker) become leads
+  max_audits_per_run: 150   # websites crawled per GitHub Actions run (~3 minutes)
+  # A lead needs this score (0-100, higher = weaker site) AND at least one problem a
+  # customer would notice (not mobile-friendly, "Not secure", very heavy, visibly dated).
+  # Measured on 150 Austin sites: about 1 in 3 readable sites has such a problem.
+  min_score: 20
   request_timeout: 15
   user_agent: "LocalSiteAudit/1.0 (website quality check)"
 

@@ -16,6 +16,10 @@ from concurrent.futures import ThreadPoolExecutor
 from . import audit, config, prospect
 
 
+CITIES_DONE = "_cities_done"
+RECHECK_CITY_DAYS = 30
+
+
 def load_seen() -> dict:
     if config.SEEN_PATH.exists():
         return json.loads(config.SEEN_PATH.read_text(encoding="utf-8"))
@@ -30,7 +34,8 @@ def save_seen(seen: dict) -> None:
 def qualifies(lead: dict, cfg: dict, suppression: set[str]) -> tuple[bool, str]:
     if lead["status"] != "ok":
         return False, lead["status"]
-    if lead["score"] < cfg["prospecting"]["min_score"]:
+    visible = [i for i in lead["issues"] if i["id"] in audit.VISIBLE]
+    if lead["score"] < cfg["prospecting"]["min_score"] or not visible:
         return False, "site_good_enough"
     emails = [e for e in lead["emails"] if not config.is_suppressed(e, suppression)]
     if not cfg["outreach"].get("allow_freemail_recipients", True):
@@ -55,11 +60,16 @@ def run(cfg: dict, max_audits: int | None = None, only_city: str | None = None, 
     issue_counts: Counter = Counter()
     all_issue_counts: Counter = Counter()
     score_buckets: Counter = Counter()
-    readable = with_email = 0
+    readable = with_email = with_visible = 0
 
+    today = dt.date.today()
+    cities_done = seen.setdefault(CITIES_DONE, {})
     for city in ([only_city] if only_city else cfg["market"]["cities"]):
         if budget <= 0:
             break
+        done_on = cities_done.get(city)
+        if done_on and (today - dt.date.fromisoformat(done_on)).days < RECHECK_CITY_DAYS:
+            continue  # fully audited recently; new businesses appear slowly
         try:
             businesses = prospect.find_businesses(city, cfg["market"]["categories"], user_agent)
         except Exception as exc:  # one city failing must not kill the run
@@ -68,10 +78,13 @@ def run(cfg: dict, max_audits: int | None = None, only_city: str | None = None, 
         fresh = [
             b for b in businesses
             if b["domain"] not in seen and not config.is_suppressed(b["domain"], suppression)
+            and b["domain"] != CITIES_DONE
         ]
         print(f"[{city}] {len(businesses)} businesses with a website, {len(fresh)} not audited yet")
         batch = fresh[:budget]
         budget -= len(batch)
+        if len(batch) == len(fresh):
+            cities_done[city] = today.isoformat()
         if not batch:
             continue
 
@@ -85,6 +98,7 @@ def run(cfg: dict, max_audits: int | None = None, only_city: str | None = None, 
                 readable += 1
                 with_email += bool(lead["emails"])
                 score_buckets[f"{lead['score'] // 10 * 10:02d}+"] += 1
+                with_visible += any(i["id"] in audit.VISIBLE for i in lead["issues"])
                 all_issue_counts.update(i["id"] for i in lead["issues"])
             ok, reason = qualifies(lead, cfg, suppression)
             outcomes[reason.split(":")[0]] += 1
@@ -103,12 +117,13 @@ def run(cfg: dict, max_audits: int | None = None, only_city: str | None = None, 
     if issue_counts:
         print(f"Issues across new leads: {dict(issue_counts.most_common())}")
     if readable:
-        print(f"Readable sites: {readable}, of which {with_email} publish an email.")
+        print(f"Readable sites: {readable}; {with_email} publish an email; "
+              f"{with_visible} have a customer-visible problem.")
         print(f"Score distribution: {dict(sorted(score_buckets.items()))}")
         print(f"Issues across all readable sites: {dict(all_issue_counts.most_common())}")
     if dry_run:
         print("DRY RUN: nothing was saved.")
-    if new_leads == 0 and not outcomes:
+    if not outcomes:
         print("Nothing new to audit — every business in the configured cities has been seen. "
               "Add more cities or categories in config.yaml.")
     return new_leads

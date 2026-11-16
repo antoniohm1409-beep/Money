@@ -73,6 +73,14 @@ class AnalyzeHtmlTest(unittest.TestCase):
         self.assertFalse(found("/js/jquery.fancybox-1.3.4.js"))
         self.assertFalse(found("/js/jquery-migrate-1.4.1.min.js"))
 
+    def test_only_certainly_downloaded_images_are_weighed(self):
+        html = ('<html><head><title>X co</title></head><body><img src="/hero.jpg" alt="a">'
+                '<img src="/lazy.jpg" loading="lazy" alt="b"><img src="/set.jpg" srcset="/s.jpg 480w" alt="c">'
+                '<img src="data:image/gif;base64,AAAA" alt="d"></body></html>')
+        result = audit.analyze_html("https://x.example/", html, 0.1, TODAY)
+        self.assertEqual(result["eager_images"], ["https://x.example/hero.jpg"])
+        self.assertEqual(len(result["content"]["images"]), 3)
+
     def test_mixed_content_only_on_https(self):
         html = '<html><head><title>X co</title></head><body><img src="http://x.example/a.jpg" alt="a"></body></html>'
         self.assertIn("mixed_content", ids(audit.analyze_html("https://x.example", html, 0.1, TODAY)))
@@ -227,11 +235,16 @@ class AuditSiteOverHttpTest(unittest.TestCase):
         self.assertEqual(run.qualifies(dict(lead), cfg, set()), (True, "lead"))
         everything = {e.rsplit("@", 1)[-1] for e in lead["emails"]} | set(lead["emails"])
         self.assertEqual(run.qualifies(dict(lead), cfg, everything), (False, "no_email"))
+        # plenty of points but nothing a customer would notice -> not worth an email
+        seo_only = dict(lead, score=60, issues=[{"id": "no_meta_description"}, {"id": "no_h1"}])
+        self.assertEqual(run.qualifies(seo_only, cfg, set()), (False, "site_good_enough"))
         good = audit.audit_site(self.business("modern.html"), "test-agent", timeout=5)
         # local server is plain http and sends no charset header: the only finding must be the
         # missing https, and the UTF-8 "© 2019–2026" footer must still be read as 2026
         self.assertEqual([i["id"] for i in good["issues"]], ["no_https"])
-        self.assertEqual(run.qualifies(good, cfg, set()), (False, "site_good_enough"))
+        self.assertEqual(run.qualifies(dict(good), cfg, set()), (True, "lead"))  # "Not secure" alone is a lead
+        clean = dict(good, issues=[], score=0)  # the same site once it is served over https
+        self.assertEqual(run.qualifies(clean, cfg, set()), (False, "site_good_enough"))
 
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):

@@ -61,12 +61,20 @@ WEIGHTS = {
     "mixed_content": 8,
     "weak_title": 8,
     "no_meta_description": 8,
-    "no_click_to_call": 8,
+    "no_click_to_call": 4,
     "no_h1": 5,
     "old_jquery": 5,
     "images_missing_alt": 4,
     "no_structured_data": 4,
     "no_open_graph": 3,
+}
+
+
+# Problems a customer notices without knowing anything about websites. A lead needs at least one:
+# an email about missing meta tags alone is not worth an owner's time.
+VISIBLE = {
+    "no_viewport", "no_https", "no_https_redirect", "legacy_markup", "outdated_copyright",
+    "very_outdated_copyright", "slow_response", "heavy_images", "mixed_content", "outdated_cms",
 }
 
 
@@ -279,8 +287,8 @@ def analyze_html(final_url: str, html: str, elapsed: float | None = None, today:
     if not tel_links:
         issues.append(issue(
             "no_click_to_call",
-            "The phone number cannot be tapped to call from a mobile phone.",
-            "No tel: link on the home page.",
+            "There is no tap-to-call button, so mobile visitors have to hunt for the number in the text.",
+            "No tel: link on the home page (phones may still auto-detect a number written as text).",
         ))
 
     images = soup.find_all("img")
@@ -342,9 +350,17 @@ def analyze_html(final_url: str, html: str, elapsed: float | None = None, today:
                 contact_links.append(absolute)
     # "contact" pages before "about" pages
     contact_links.sort(key=lambda u: 0 if re.search(r"contact|kontakt|contatt", u, re.I) else 1)
+    # Only images the browser certainly downloads on load: not lazy-loaded, and no srcset
+    # (with srcset the browser may pick a smaller file than the one named in src).
+    eager_images = list(dict.fromkeys(
+        urljoin(final_url, img.get("src")) for img in images
+        if img.get("src") and not img.get("src", "").startswith("data:")
+        and (img.get("loading") or "").lower() != "lazy" and not img.get("srcset")
+    ))
     return {
         "issues": issues,
         "content": content,
+        "eager_images": eager_images,
         "emails": extract_emails(html, soup),
         "contact_links": contact_links[:2],
     }
@@ -489,7 +505,7 @@ def audit_site(business: dict, user_agent: str, timeout: int = 15) -> dict:
                 f"Final URL {resp.url}; https:// version failed to load.",
             ))
 
-    heavy = heavy_images_issue(measure_images(session, analysis["content"]["images"]))
+    heavy = heavy_images_issue(measure_images(session, analysis["eager_images"]))
     if heavy:
         issues.append(heavy)
 
