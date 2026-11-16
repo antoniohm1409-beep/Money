@@ -5,6 +5,8 @@ import shutil
 import tempfile
 import threading
 import unittest
+
+import requests
 from pathlib import Path
 
 from pipeline import audit, config, prospect, run
@@ -43,7 +45,7 @@ class AnalyzeHtmlTest(unittest.TestCase):
         self.assertIn("WordPress 4.9.8", by_id["outdated_cms"]["evidence"])
         self.assertIn("jQuery 1.7", by_id["old_jquery"]["plain"])
         self.assertIn("3 of 4 images", by_id["images_missing_alt"]["evidence"])
-        self.assertIn("4.2 seconds", by_id["slow_response"]["plain"])
+        self.assertIn("took 4.2 seconds", by_id["slow_response"]["plain"])
 
     def test_modern_site_is_clean(self):
         self.assertEqual(ids(self.modern), set())
@@ -222,6 +224,13 @@ class AuditSiteOverHttpTest(unittest.TestCase):
         heavy = next(i for i in lead["issues"] if i["id"] == "heavy_images")
         self.assertIn("about 3.1 MB of images (the largest alone is 2.2 MB)", heavy["plain"])
         self.assertIn("2 home page images", heavy["evidence"])  # logo.gif and team.jpg do not exist
+
+    def test_endless_response_is_cut_off(self):
+        (Path(self.tmp.name) / "huge.html").write_bytes(b"<html><body>" + b"x" * 5_000_000)
+        resp, elapsed = audit._fetch(requests.Session(), f"{self.base}/huge.html", timeout=5)
+        self.assertLessEqual(len(resp.content), audit.MAX_BODY_BYTES)
+        self.assertGreater(len(resp.content), 1_000_000)
+        self.assertLess(elapsed, 5)
 
     def test_missing_page_is_not_a_lead(self):
         lead = audit.audit_site(self.business("nope.html"), "test-agent", timeout=5)

@@ -70,6 +70,7 @@ def run(cfg: dict, max_audits: int | None = None, only_city: str | None = None, 
         done_on = cities_done.get(city)
         if done_on and (today - dt.date.fromisoformat(done_on)).days < RECHECK_CITY_DAYS:
             continue  # fully audited recently; new businesses appear slowly
+        print(f"[{city}] looking up businesses…", flush=True)
         try:
             businesses = prospect.find_businesses(city, cfg["market"]["categories"], user_agent)
         except Exception as exc:  # one city failing must not kill the run
@@ -80,7 +81,7 @@ def run(cfg: dict, max_audits: int | None = None, only_city: str | None = None, 
             if b["domain"] not in seen and not config.is_suppressed(b["domain"], suppression)
             and b["domain"] != CITIES_DONE
         ]
-        print(f"[{city}] {len(businesses)} businesses with a website, {len(fresh)} not audited yet")
+        print(f"[{city}] {len(businesses)} businesses with a website, {len(fresh)} not audited yet", flush=True)
         batch = fresh[:budget]
         budget -= len(batch)
         if len(batch) == len(fresh):

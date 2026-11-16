@@ -211,9 +211,9 @@ def analyze_html(final_url: str, html: str, elapsed: float | None = None, today:
     if elapsed is not None and elapsed >= 3.0:
         issues.append(issue(
             "slow_response",
-            f"The home page took {elapsed:.1f} seconds just to start loading in our test; "
-            "most visitors leave after about 3.",
-            f"Best of two HTML fetches: {elapsed:.2f}s.",
+            f"The server took {elapsed:.1f} seconds before it even started sending the home page in our test, "
+            "so visitors stare at a blank screen for that long.",
+            f"Time to first response, best of two requests: {elapsed:.2f}s.",
         ))
 
     # CMS / libraries
@@ -385,15 +385,36 @@ def decode_body(resp: requests.Response) -> str:
     return UnicodeDammit(resp.content, hints, is_html=True).unicode_markup or resp.text
 
 
+MAX_BODY_BYTES = 3_000_000
+
+
 def _fetch(session: requests.Session, url: str, timeout: int) -> tuple[requests.Response, float]:
+    """GET with a bounded body and a wall-clock limit.
+
+    `timeout` in requests only limits the gap between bytes, so a "website" that is really a
+    radio stream or a slow-drip server would otherwise hold a worker forever. Returns the
+    response (body truncated to MAX_BODY_BYTES) and the seconds until the server started answering.
+    """
     started = time.monotonic()
-    resp = session.get(url, timeout=timeout, allow_redirects=True)
-    return resp, time.monotonic() - started
+    resp = session.get(url, timeout=timeout, allow_redirects=True, stream=True)
+    elapsed = time.monotonic() - started
+    chunks, size = [], 0
+    try:
+        for chunk in resp.iter_content(65536):
+            chunks.append(chunk)
+            size += len(chunk)
+            if size >= MAX_BODY_BYTES or time.monotonic() - started > timeout * 2:
+                break
+    finally:
+        resp.close()
+    resp._content = b"".join(chunks)[:MAX_BODY_BYTES]  # what .content/.text return from here on
+    resp._content_consumed = True
+    return resp, elapsed
 
 
 def _robots_allows(session: requests.Session, base_url: str, user_agent: str, timeout: int) -> bool:
     try:
-        resp = session.get(urljoin(base_url, "/robots.txt"), timeout=timeout)
+        resp, _ = _fetch(session, urljoin(base_url, "/robots.txt"), timeout)
     except requests.RequestException:
         return True
     if resp.status_code != 200 or "<html" in resp.text[:500].lower():
@@ -489,7 +510,7 @@ def audit_site(business: dict, user_agent: str, timeout: int = 15) -> dict:
     if not resp.url.lower().startswith("https://"):
         https_ok = False
         try:
-            https_resp = session.get("https://" + urlparse(resp.url).netloc, timeout=timeout)
+            https_resp, _ = _fetch(session, "https://" + urlparse(resp.url).netloc, timeout)
             https_ok = https_resp.status_code == 200
         except requests.RequestException:
             https_ok = False
@@ -515,7 +536,7 @@ def audit_site(business: dict, user_agent: str, timeout: int = 15) -> dict:
     emails = result["emails"] + analysis["emails"]
     for contact_url in analysis["contact_links"]:
         try:
-            contact_resp = session.get(contact_url, timeout=timeout)
+            contact_resp, _ = _fetch(session, contact_url, timeout)
         except requests.RequestException:
             continue
         if contact_resp.status_code == 200:

@@ -55,7 +55,7 @@ jobs:
             echo "::warning::Repository is public - dry run only. Make it private to start saving leads."
             args+=(--dry-run)
           fi
-          python -m pipeline.run "${args[@]}"
+          python -u -m pipeline.run "${args[@]}"
       - name: Save new leads
         if: steps.repo.outputs.private == 'true'
         run: |
