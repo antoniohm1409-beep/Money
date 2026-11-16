@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+# agent scratch: drafts awaiting validation, CRM snapshots
+outbox/
+handled.txt

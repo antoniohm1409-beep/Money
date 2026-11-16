@@ -1,0 +1,77 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Everything the pipeline and the agents need to know about YOUR business.
+# Fill in the `sender` block before any email is drafted — the agents refuse to
+# write outreach while a field there still says TODO.
+# ─────────────────────────────────────────────────────────────────────────────
+
+sender:
+  name: "TODO"              # your real name, e.g. "Antonio H."
+  business_name: "TODO"     # trading name, e.g. "Northside Web Studio"
+  # A real postal address is legally required in commercial email in the US
+  # (CAN-SPAM) and is good practice everywhere. A PO box / virtual office is fine.
+  postal_address: "TODO"
+  reply_email: ""           # leave empty to use the Gmail account the drafts live in
+  phone: ""                 # optional
+  portfolio_url: ""         # optional – a page showing 2-3 sites you built
+
+offer:
+  # What you sell. Keep it one fixed-price thing: easy to say yes to.
+  headline: "A fast, mobile-friendly one-page website rebuild"
+  price: "$490"
+  delivery_days: 5
+  includes:
+    - "New mobile-first homepage built from your existing content"
+    - "Click-to-call, map, opening hours and contact form"
+    - "Basic on-page SEO (titles, descriptions, local business markup)"
+    - "One round of revisions"
+  upsell: "Hosting + small monthly edits for $29/month (optional)"
+  # Stripe Payment Link / PayPal.me / invoice link. Only shared once a lead says yes.
+  payment_link: ""
+  # The free hook offered in the first email.
+  free_hook: "a free mock-up of your new homepage, no commitment"
+
+market:
+  language: "en"            # language the emails are written in
+  country: "US"             # ISO code – drives the legal footer, see README "Legal"
+  # Worked through in order; add more cities when one is exhausted.
+  cities:
+    - "Austin, Texas, USA"
+    - "San Antonio, Texas, USA"
+    - "Fort Worth, Texas, USA"
+  # OpenStreetMap tags of business types to prospect. High customer value +
+  # commonly dated websites = best odds.
+  categories:
+    - "amenity=dentist"
+    - "amenity=veterinary"
+    - "craft=plumber"
+    - "craft=electrician"
+    - "craft=roofer"
+    - "craft=hvac"
+    - "shop=car_repair"
+    - "office=lawyer"
+    - "office=accountant"
+    - "shop=hairdresser"
+    - "amenity=restaurant"
+
+prospecting:
+  max_audits_per_run: 80    # websites crawled per GitHub Actions run
+  min_score: 35             # 0-100; only sites this weak (or weaker) become leads
+  request_timeout: 15
+  user_agent: "LocalSiteAudit/1.0 (website quality check)"
+
+outreach:
+  # false = agents only create Gmail DRAFTS and you press send (recommended,
+  #         and the only mode that keeps a human reviewing every message).
+  # true  = the daily agent sends approved-template emails itself.
+  auto_send: false
+  max_new_per_day: 15       # keep it low: a normal Gmail account is not a bulk mailer
+  followups: 1              # polite nudges after the first email (0-2)
+  followup_after_days: 4
+  # Free-mail addresses (gmail.com etc.) often belong to sole traders, where the
+  # rules are stricter in some countries. false = only contact business domains.
+  allow_freemail_recipients: true
+
+crm:
+  # Google Sheet that tracks every lead. Created on first run; id stored here.
+  sheet_id: ""
+  sheet_tab: "Leads"

@@ -1,0 +1,4 @@
+# One email address or domain per line. Nothing listed here is ever audited or contacted.
+# Add your existing clients, anyone who asked not to be contacted, and competitors you know.
+# example.com
+# owner@example.com
