@@ -1,4 +1,5 @@
 name: Find leads
+run-name: Find leads (${{ github.event_name }})
 
 # Finds local businesses with weak websites and audits them. No AI and no secrets involved:
 # the agents (Claude) pick the results up from data/leads/ afterwards.
