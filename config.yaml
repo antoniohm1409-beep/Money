@@ -73,5 +73,5 @@ outreach:
 
 crm:
   # Google Sheet that tracks every lead. Created on first run; id stored here.
-  sheet_id: ""
+  sheet_id: "1KQ0_AERK9uD4Z4vxKKYDFNmry6S_UbMExVUuf6wN8iY"
   sheet_tab: "Leads"
