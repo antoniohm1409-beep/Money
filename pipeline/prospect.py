@@ -48,7 +48,9 @@ def build_overpass_query(categories: list[str], bbox: tuple[float, float, float,
     return "[out:json][timeout:90];\n(\n" + "\n".join(clauses) + "\n);\nout tags center;"
 
 
-def run_overpass(query: str, user_agent: str, timeout: int = 120) -> list[dict]:
+def run_overpass(query: str, user_agent: str, timeout: int = 100) -> list[dict]:
+    """Try each mirror in turn (twice). A busy mirror answers 429/504 quickly; a dead one costs
+    one timeout, so the worst case stays well inside the workflow's time limit."""
     last_error: Exception | None = None
     for attempt, url in enumerate(OVERPASS_URLS * 2):
         try:

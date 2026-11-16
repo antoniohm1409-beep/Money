@@ -406,7 +406,10 @@ def _robots_allows(session: requests.Session, base_url: str, user_agent: str, ti
 def measure_images(session: requests.Session, urls: list[str], timeout: int = 8) -> dict | None:
     """Total download size of the home page's images, from Content-Length headers."""
     sizes: list[tuple[int, str]] = []
+    deadline = time.monotonic() + 25  # a slow image host must not stall the whole run
     for url in urls[:15]:
+        if time.monotonic() > deadline:
+            break
         try:
             resp = session.head(url, timeout=timeout, allow_redirects=True)
             size = int(resp.headers.get("content-length") or 0)
